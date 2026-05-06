@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.env
+.DS_Store
+*.log
+
+# Archivos grandes comunes en ML / Data Science
+*.h5
+*.keras
+*.pkl
+*.joblib
+
+# Carpetas de datos, edita si SÍ quieres subirlas
+data/
+datasets/
