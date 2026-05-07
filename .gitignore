@@ -1,16 +1,27 @@
 __pycache__/
 *.pyc
+*.py[cod]
 .ipynb_checkpoints/
 .env
 .DS_Store
 *.log
+.pytest_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
 
 # Archivos grandes comunes en ML / Data Science
 *.h5
 *.keras
 *.pkl
 *.joblib
+*.pt
+*.pth
 
 # Carpetas de datos, edita si SÍ quieres subirlas
 data/
 datasets/
+Data/processed/
+artifacts/

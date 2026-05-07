@@ -1,0 +1,607 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "model_io_schema.json",
+  "title": "HMM + FINN MVP Model IO Schema",
+  "version": "0.1",
+  "description": "Schema for the MVP pipeline inputs and outputs of a multimodal financial option pricing system using HMM + FINN.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "dataset_row_schema",
+    "baseline_input",
+    "hmm_input",
+    "finn_input",
+    "system_output"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": [
+        "project_name",
+        "mvp_underlying",
+        "mvp_derivative",
+        "frequency",
+        "created_for"
+      ],
+      "properties": {
+        "project_name": {
+          "type": "string"
+        },
+        "mvp_underlying": {
+          "type": "string",
+          "enum": [
+            "SPY",
+            "SPX"
+          ]
+        },
+        "mvp_derivative": {
+          "type": "string"
+        },
+        "frequency": {
+          "type": "string",
+          "enum": [
+            "daily",
+            "intraday"
+          ]
+        },
+        "created_for": {
+          "type": "string"
+        }
+      },
+      "example": {
+        "project_name": "Modelo Multimodal de Predicción y Valoración Financiera con HMM + FINN",
+        "mvp_underlying": "SPY",
+        "mvp_derivative": "SPY Call Options",
+        "frequency": "daily",
+        "created_for": "MVP development context"
+      }
+    },
+    "dataset_row_schema": {
+      "type": "object",
+      "description": "One row represents one option at one timestamp.",
+      "required": [
+        "timestamp",
+        "underlying_symbol",
+        "option_symbol",
+        "option_type",
+        "S",
+        "K",
+        "T",
+        "r",
+        "market_price",
+        "implied_volatility"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Observation timestamp."
+        },
+        "underlying_symbol": {
+          "type": "string",
+          "description": "Underlying symbol, initially SPY."
+        },
+        "option_symbol": {
+          "type": "string",
+          "description": "Unique option contract identifier."
+        },
+        "option_type": {
+          "type": "string",
+          "enum": [
+            "call",
+            "put"
+          ]
+        },
+        "S": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Underlying price."
+        },
+        "K": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Strike price."
+        },
+        "T": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Time to maturity in years."
+        },
+        "r": {
+          "type": "number",
+          "description": "Annualized risk-free rate in decimal format."
+        },
+        "market_price": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Observed market target price."
+        },
+        "bid": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "ask": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "mid_price": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "volume": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "open_interest": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "implied_volatility": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Annualized implied volatility in decimal format."
+        },
+        "realized_volatility": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "return_1d": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "return_5d": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sentiment_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "text_embedding": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number"
+          }
+        },
+        "event_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "dividend_yield": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "baseline_input": {
+      "type": "object",
+      "required": [
+        "S",
+        "K",
+        "T",
+        "r",
+        "sigma",
+        "option_type"
+      ],
+      "properties": {
+        "S": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "K": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "T": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "r": {
+          "type": "number"
+        },
+        "sigma": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "dividend_yield": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        },
+        "option_type": {
+          "type": "string",
+          "enum": [
+            "call",
+            "put"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "baseline_output": {
+      "type": "object",
+      "required": [
+        "bs_price",
+        "bs_delta",
+        "bs_gamma"
+      ],
+      "properties": {
+        "bs_price": {
+          "type": "number"
+        },
+        "bs_delta": {
+          "type": "number"
+        },
+        "bs_gamma": {
+          "type": "number"
+        },
+        "bs_vega": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "bs_theta": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "bs_rho": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "hmm_input": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "features"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "features": {
+          "type": "object",
+          "properties": {
+            "return_1d": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "return_5d": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "realized_volatility": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "implied_volatility": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "volume": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "sentiment_score": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "z_t": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "hmm_output": {
+      "type": "object",
+      "required": [
+        "regime_label",
+        "regime_probabilities",
+        "sigma_regime"
+      ],
+      "properties": {
+        "regime_label": {
+          "type": "string",
+          "enum": [
+            "stable_low_volatility",
+            "stress_high_volatility",
+            "transition_uncertainty",
+            "unknown"
+          ]
+        },
+        "regime_probabilities": {
+          "type": "array",
+          "description": "Canonical order: stable_low_volatility, stress_high_volatility, transition_uncertainty.",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "sigma_regime": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "finn_input": {
+      "type": "object",
+      "required": [
+        "S",
+        "K",
+        "T",
+        "r",
+        "sigma_regime",
+        "option_type"
+      ],
+      "properties": {
+        "S": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "K": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "T": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "r": {
+          "type": "number"
+        },
+        "sigma_regime": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "dividend_yield": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        },
+        "option_type": {
+          "type": "string",
+          "enum": [
+            "call",
+            "put"
+          ]
+        },
+        "regime_probabilities": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "Canonical order: stable_low_volatility, stress_high_volatility, transition_uncertainty.",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "z_t": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "finn_output": {
+      "type": "object",
+      "required": [
+        "fair_value",
+        "delta",
+        "gamma"
+      ],
+      "properties": {
+        "fair_value": {
+          "type": "number"
+        },
+        "delta": {
+          "type": "number"
+        },
+        "gamma": {
+          "type": "number"
+        },
+        "vega": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "theta": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "pde_residual": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "system_output": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "underlying_symbol",
+        "option_symbol",
+        "market_price",
+        "bs_price",
+        "fair_value",
+        "edge",
+        "delta",
+        "gamma",
+        "regime_label",
+        "regime_probabilities",
+        "signal"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "underlying_symbol": {
+          "type": "string"
+        },
+        "option_symbol": {
+          "type": "string"
+        },
+        "market_price": {
+          "type": "number"
+        },
+        "bs_price": {
+          "type": "number"
+        },
+        "fair_value": {
+          "type": "number"
+        },
+        "edge": {
+          "type": "number"
+        },
+        "delta": {
+          "type": "number"
+        },
+        "gamma": {
+          "type": "number"
+        },
+        "regime_label": {
+          "type": "string"
+        },
+        "regime_probabilities": {
+          "type": "array",
+          "description": "Canonical order: stable_low_volatility, stress_high_volatility, transition_uncertainty.",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "signal": {
+          "type": "string",
+          "enum": [
+            "BUY",
+            "SELL",
+            "HOLD"
+          ]
+        },
+        "transaction_cost_estimate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "safety_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "example_system_output": {
+    "timestamp": "2026-04-01T00:00:00Z",
+    "underlying_symbol": "SPY",
+    "option_symbol": "SPY_20260501_520_C",
+    "market_price": 8.4,
+    "bs_price": 8.12,
+    "fair_value": 8.95,
+    "edge": 0.55,
+    "delta": 0.58,
+    "gamma": 0.032,
+    "regime_label": "stress_high_volatility",
+    "regime_probabilities": [
+      0.15,
+      0.7,
+      0.15
+    ],
+    "signal": "BUY",
+    "transaction_cost_estimate": 0.08,
+    "safety_margin": 0.15
+  }
+}
