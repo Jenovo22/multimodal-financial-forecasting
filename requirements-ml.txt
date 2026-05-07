@@ -1,2 +1,2 @@
--r requirements-dev.txt
+-r requirements-data.txt
 torch>=2.6

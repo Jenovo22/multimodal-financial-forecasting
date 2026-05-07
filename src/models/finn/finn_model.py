@@ -34,11 +34,12 @@ class FINNConfig:
     learning_rate: float = 1e-3
     weight_decay: float = 1e-6
     batch_size: int = 64
-    epochs: int = 200
+    epochs: int = 300
     lambda_data: float = 1.0
     lambda_boundary: float = 0.1
-    lambda_pde: float = 0.1
-    lambda_arbitrage: float = 0.0
+    lambda_pde: float = 0.0
+    lambda_arbitrage: float = 1.0
+    feature_std_floor: float = 1e-6
     gradient_clip_norm: float | None = 5.0
     random_state: int = 42
     device: str = "cpu"
@@ -74,7 +75,10 @@ class FINNPricingModel:
 
         feature_matrix = self._encode_feature_matrix(dataset)
         self.feature_mean_ = feature_matrix.mean(dim=0)
-        self.feature_std_ = torch.clamp(feature_matrix.std(dim=0, unbiased=False), min=1e-6)
+        self.feature_std_ = _stable_feature_std(
+            feature_matrix,
+            floor=self.config.feature_std_floor,
+        )
 
         self.model_ = _FINNNetwork(
             input_dim=feature_matrix.shape[1],
@@ -372,6 +376,14 @@ def _activation_module(name: str) -> type[nn.Module]:
     if normalized == "gelu":
         return nn.GELU
     return nn.SiLU
+
+
+def _stable_feature_std(features: Tensor, *, floor: float) -> Tensor:
+    """Avoid exploding input gradients for columns that are constant in one chain."""
+
+    assert torch is not None
+    raw_std = features.std(dim=0, unbiased=False)
+    return torch.where(raw_std < floor, torch.ones_like(raw_std), raw_std)
 
 
 def _mean_metric_dict(items: list[dict[str, float]]) -> dict[str, float]:

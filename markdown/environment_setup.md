@@ -10,21 +10,21 @@ This project supports two equivalent dependency entry points:
 From the repository root:
 
 ```powershell
-.\scripts\setup_environment.bat -WithML
+.\scripts\setup_environment.bat -WithData -WithML
 ```
 
-This creates `.venv`, upgrades `pip`, installs the project in editable mode with development dependencies, installs CPU PyTorch, compiles Python files, and runs the test suite.
+This creates `.venv`, upgrades `pip`, installs the project in editable mode with development and data-ingestion dependencies, installs CPU PyTorch, compiles Python files, and runs the test suite.
 
 If you only need the API, baseline, HMM, and dataset utilities without PyTorch:
 
 ```powershell
-.\scripts\setup_environment.bat
+.\scripts\setup_environment.bat -WithData
 ```
 
 To skip tests during installation:
 
 ```powershell
-.\scripts\setup_environment.bat -WithML -SkipTests
+.\scripts\setup_environment.bat -WithData -WithML -SkipTests
 ```
 
 ## Manual setup
@@ -33,7 +33,7 @@ To skip tests during installation:
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,data]"
 python -m pip install "torch>=2.6" --index-url https://download.pytorch.org/whl/cpu
 python -m pytest -q
 ```
@@ -42,6 +42,7 @@ python -m pytest -q
 
 - `requirements.txt`: runtime API/data/HMM dependencies.
 - `requirements-dev.txt`: runtime plus testing dependencies.
-- `requirements-ml.txt`: development plus PyTorch for FINN training.
+- `requirements-data.txt`: development plus yfinance for automated option-chain ingestion.
+- `requirements-ml.txt`: data/development plus PyTorch for FINN training.
 
 The recommended route remains `setup_environment.bat` because it handles the Windows PowerShell execution policy and installs PyTorch from the CPU wheel index explicitly.

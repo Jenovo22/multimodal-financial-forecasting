@@ -21,7 +21,7 @@ build/
 *.pth
 
 # Carpetas de datos, edita si SÍ quieres subirlas
-data/
-datasets/
-Data/processed/
-artifacts/
+/data/
+/datasets/
+/Data/
+/artifacts/

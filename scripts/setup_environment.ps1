@@ -1,4 +1,5 @@
 param(
+    [switch]$WithData,
     [switch]$WithML,
     [switch]$NoDev,
     [switch]$SkipTests,
@@ -31,13 +32,22 @@ if ($WithML) {
     & $VenvPython -m pip install "torch>=2.6" --index-url $TorchIndexUrl
 }
 
-if ($NoDev) {
-    Write-Host "Installing project runtime dependencies"
-    & $VenvPython -m pip install -e .
-} else {
-    Write-Host "Installing project with development dependencies"
-    & $VenvPython -m pip install -e ".[dev]"
+$Extras = @()
+if (-not $NoDev) {
+    $Extras += "dev"
 }
+if ($WithData) {
+    $Extras += "data"
+}
+
+if ($Extras.Count -eq 0) {
+    $InstallTarget = "."
+} else {
+    $InstallTarget = ".[{0}]" -f ($Extras -join ",")
+}
+
+Write-Host "Installing project target $InstallTarget"
+& $VenvPython -m pip install -e $InstallTarget
 
 Write-Host "Compiling Python files"
 & $VenvPython -m compileall -q src tests scripts

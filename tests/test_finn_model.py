@@ -153,3 +153,36 @@ def test_finn_model_fit_predict_save_and_load(tmp_path):
         rel_tol=1e-6,
         abs_tol=1e-6,
     )
+
+
+def test_finn_model_uses_safe_std_for_constant_features():
+    features, targets = build_training_samples()
+    constant_spot_features = [
+        FINNInput(
+            S=500.0,
+            K=sample.K,
+            T=sample.T,
+            r=0.03,
+            sigma_regime=sample.sigma_regime,
+            option_type=sample.option_type,
+            dividend_yield=0.0,
+            regime_probabilities=sample.regime_probabilities,
+        )
+        for sample in features[:8]
+    ]
+    model = FINNPricingModel(
+        FINNConfig(
+            hidden_dims=(16,),
+            epochs=1,
+            batch_size=4,
+            lambda_boundary=0.0,
+            lambda_pde=0.0,
+            lambda_arbitrage=0.0,
+        )
+    )
+
+    model.fit(constant_spot_features, targets[:8])
+
+    assert model.feature_std_ is not None
+    assert model.feature_std_[0].item() == pytest.approx(1.0)
+    assert model.feature_std_[5].item() == pytest.approx(1.0)

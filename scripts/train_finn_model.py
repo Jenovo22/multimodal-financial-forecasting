@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Output checkpoint path.",
     )
-    parser.add_argument("--epochs", default=200, type=int, help="Training epochs.")
+    parser.add_argument("--epochs", default=300, type=int, help="Training epochs.")
     parser.add_argument("--batch-size", default=64, type=int, help="Mini-batch size.")
     parser.add_argument(
         "--learning-rate",
@@ -51,13 +51,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--lambda-pde",
-        default=0.1,
+        default=0.0,
         type=float,
         help="PDE residual loss weight.",
     )
     parser.add_argument(
         "--lambda-arbitrage",
-        default=0.0,
+        default=1.0,
         type=float,
         help="No-arbitrage regularization weight.",
     )
