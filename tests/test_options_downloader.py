@@ -128,10 +128,11 @@ def test_filter_expirations_by_dte_raises_when_window_is_empty():
 
 
 def test_default_raw_options_path_is_stable():
-    assert str(
-        default_raw_options_path(
-            output_dir="Data/raw/options",
-            symbol="spy",
-            quote_timestamp="2026-05-05T00:00:00Z",
-        )
-    ).endswith("Data\\raw\\options\\SPY_options_2026-05-05.csv")
+    path = default_raw_options_path(
+        output_dir="Data/raw/options",
+        symbol="spy",
+        quote_timestamp="2026-05-05T00:00:00Z",
+    )
+
+    assert path.parts[-4:-1] == ("Data", "raw", "options")
+    assert path.name == "SPY_options_2026-05-05.csv"
