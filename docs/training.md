@@ -36,6 +36,18 @@ Use this while the project has only one option snapshot date:
 - `timestamp`: preferred once multiple daily option snapshots exist. The model trains on older dates and tests on future unseen dates.
 - `random`: only for smoke tests or debugging. It is not a reliable financial validation strategy.
 
+Before using `timestamp`, combine raw option snapshots and verify the manifest:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\combine_option_snapshots.py `
+  --source-dir Data\raw\options `
+  --output Data\processed\combined_option_snapshots.csv `
+  --manifest-output Data\processed\combined_option_snapshots_manifest.json `
+  --require-timestamp-split-ready
+```
+
+See [data_evaluation.md](data_evaluation.md).
+
 ## Outputs
 
 - `Data/processed/finn_split_dataset.csv`: rows with `train`, `validation` or `test`.
@@ -66,4 +78,3 @@ A model is not operationally strong just because MAE improves. Also inspect spre
 5. Compare FINN against BSM on the future test window.
 6. Score the latest option chain with realistic transaction cost and safety margin.
 7. Review dashboard candidates by liquidity before considering any simulated trade.
-

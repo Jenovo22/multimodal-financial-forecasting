@@ -26,6 +26,17 @@ If collaborators need the same generated file, document:
 - Expected row count.
 - Checksum if the file is large or shared externally.
 
+For option snapshots, generate a combined manifest with:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\combine_option_snapshots.py `
+  --source-dir Data\raw\options `
+  --output Data\processed\combined_option_snapshots.csv `
+  --manifest-output Data\processed\combined_option_snapshots_manifest.json
+```
+
+The manifest should be used in PR descriptions instead of committing generated datasets.
+
 ## Model Artifacts
 
 Checkpoints such as `artifacts/finn_model.pt` are local outputs. Do not commit them unless the team explicitly creates a release process for model artifacts.
@@ -52,4 +63,3 @@ If data size grows, introduce one of these:
 - Cloud object storage for datasets and checkpoints.
 - DVC for reproducible dataset versioning.
 - GitHub Releases for frozen small artifacts.
-
