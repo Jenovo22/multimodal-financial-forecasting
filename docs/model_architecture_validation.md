@@ -107,3 +107,38 @@ Promotion rule:
 
 The available local option dataset currently has one quote timestamp. Architecture results are useful for smoke validation and relative comparison across expirations, but they are not enough to prove temporal generalization. The data branch must collect multiple daily snapshots before architecture changes can be considered robust in a future-date sense.
 
+## Latest Local Validation
+
+Run date: 2026-05-08.
+
+Command:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_finn_architecture_validation.py `
+  --epochs 300 `
+  --output-dir $env:TEMP\finn_architecture_validation_full
+```
+
+Results:
+
+| Rank | Experiment | Final MAE | Final RMSE | BSM MAE | Gamma Negative |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 1 | `compact_32x32_silu_scale050` | `0.181766` | `0.213050` | `1.493047` | `0` |
+| 2 | `baseline_64x64_gelu_scale050` | `0.184492` | `0.214675` | `1.493047` | `20` |
+| 3 | `wide_128x128_silu_scale050` | `0.208463` | `0.229548` | `1.493047` | `0` |
+| 4 | `flexible_64x64_silu_scale075` | `0.226326` | `0.245815` | `1.493047` | `0` |
+| 5 | `baseline_64x64_silu_scale050` | `0.235514` | `0.263198` | `1.493047` | `0` |
+| 6 | `conservative_64x64_silu_scale025` | `0.709183` | `0.812494` | `1.493047` | `21` |
+
+Interpretation:
+
+- All tested residual FINN variants beat BSM on this expiration-based test.
+- `compact_32x32_silu_scale050` is the best current candidate: lowest final MAE/RMSE, zero negative-gamma rows, and fewer parameters than the 64x64 baseline.
+- `baseline_64x64_gelu_scale050` is close on MAE/RMSE but has 20 negative-gamma rows, so it is less attractive as a robust default.
+- `conservative_64x64_silu_scale025` is too constrained in this setup.
+
+Recommendation:
+
+- Keep `bsm_residual` as the architecture family.
+- Treat `32,32 + SiLU + residual_scale 0.50` as the current architecture candidate for the next validation round.
+- Do not promote it to the main default until it is re-tested with `--split-strategy timestamp` after multiple option snapshots exist.
