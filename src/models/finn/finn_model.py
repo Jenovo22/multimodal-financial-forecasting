@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -31,6 +32,9 @@ class FINNConfig:
     input_dim: int = 12
     hidden_dims: tuple[int, ...] = (64, 64)
     activation: str = "silu"
+    prediction_mode: str = "bsm_residual"
+    residual_scale: float = 0.50
+    residual_anchor_floor: float = 1.0
     learning_rate: float = 1e-3
     weight_decay: float = 1e-6
     batch_size: int = 64
@@ -41,6 +45,8 @@ class FINNConfig:
     lambda_arbitrage: float = 1.0
     feature_std_floor: float = 1e-6
     gradient_clip_norm: float | None = 5.0
+    early_stopping_patience: int | None = 50
+    early_stopping_min_delta: float = 1e-5
     random_state: int = 42
     device: str = "cpu"
 
@@ -55,17 +61,36 @@ class FINNPricingModel:
         self.feature_mean_: Tensor | None = None
         self.feature_std_: Tensor | None = None
         self.training_history_: list[dict[str, float]] = []
+        self.best_epoch_: int | None = None
+        self.best_validation_loss_: float | None = None
 
-    def fit(self, features: Sequence[FINNInput], targets: Sequence[float]) -> None:
+    def fit(
+        self,
+        features: Sequence[FINNInput],
+        targets: Sequence[float],
+        *,
+        validation_features: Sequence[FINNInput] | None = None,
+        validation_targets: Sequence[float] | None = None,
+    ) -> None:
         _require_torch()
         if not features:
             raise ValueError("At least one FINNInput sample is required.")
         if len(features) != len(targets):
             raise ValueError("features and targets must have the same length.")
+        if (validation_features is None) != (validation_targets is None):
+            raise ValueError("validation_features and validation_targets must be provided together.")
+        if validation_features is not None and len(validation_features) != len(validation_targets):
+            raise ValueError("validation_features and validation_targets must have the same length.")
         if self.config.batch_size <= 0:
             raise ValueError("batch_size must be positive.")
         if self.config.epochs <= 0:
             raise ValueError("epochs must be positive.")
+        if self.config.prediction_mode not in {"direct", "bsm_residual"}:
+            raise ValueError("prediction_mode must be 'direct' or 'bsm_residual'.")
+        if self.config.residual_scale < 0:
+            raise ValueError("residual_scale must be non-negative.")
+        if self.config.residual_anchor_floor <= 0:
+            raise ValueError("residual_anchor_floor must be positive.")
 
         torch.manual_seed(self.config.random_state)
         device = self._resolve_device()
@@ -84,6 +109,7 @@ class FINNPricingModel:
             input_dim=feature_matrix.shape[1],
             hidden_dims=self.config.hidden_dims,
             activation=self.config.activation,
+            zero_initialize_output=self.config.prediction_mode == "bsm_residual",
         ).to(device)
 
         optimizer = torch.optim.Adam(
@@ -99,8 +125,13 @@ class FINNPricingModel:
         )
 
         self.training_history_ = []
+        self.best_epoch_ = None
+        self.best_validation_loss_ = None
+        best_state_dict: dict[str, Tensor] | None = None
+        epochs_without_improvement = 0
         batch_size = min(self.config.batch_size, len(features))
-        for _ in range(self.config.epochs):
+        for epoch in range(self.config.epochs):
+            self.model_.train()
             permutation = torch.randperm(len(features), device=device)
             batch_metrics: list[dict[str, float]] = []
 
@@ -110,7 +141,8 @@ class FINNPricingModel:
                 batch_targets = targets_tensor[batch_indices]
                 batch_features = self._encode_feature_matrix(batch_inputs)
                 standardized = self._standardize_features(batch_features)
-                predictions = self.model_(standardized).reshape(-1)
+                raw_predictions = self.model_(standardized).reshape(-1)
+                predictions = self._price_from_network(batch_inputs, raw_predictions)
 
                 data_loss = F.mse_loss(predictions, batch_targets)
                 boundary_loss = boundary_condition_loss(batch_inputs, predictions)
@@ -143,7 +175,44 @@ class FINNPricingModel:
                     }
                 )
 
-            self.training_history_.append(_mean_metric_dict(batch_metrics))
+            epoch_metrics = _mean_metric_dict(batch_metrics)
+            if validation_features is not None and validation_targets is not None:
+                validation_data_loss = self._validation_data_loss(
+                    validation_features,
+                    validation_targets,
+                )
+                epoch_metrics["validation_data_loss"] = validation_data_loss
+                improved = (
+                    self.best_validation_loss_ is None
+                    or validation_data_loss
+                    < self.best_validation_loss_ - self.config.early_stopping_min_delta
+                )
+                if improved:
+                    self.best_validation_loss_ = validation_data_loss
+                    self.best_epoch_ = epoch + 1
+                    best_state_dict = {
+                        name: value.detach().cpu().clone()
+                        for name, value in self.model_.state_dict().items()
+                    }
+                    epochs_without_improvement = 0
+                else:
+                    epochs_without_improvement += 1
+
+            self.training_history_.append(epoch_metrics)
+
+            if (
+                validation_features is not None
+                and self.config.early_stopping_patience is not None
+                and epochs_without_improvement >= self.config.early_stopping_patience
+            ):
+                break
+
+        if best_state_dict is not None:
+            self.model_.load_state_dict(
+                {name: value.to(device) for name, value in best_state_dict.items()}
+            )
+        elif self.best_epoch_ is None:
+            self.best_epoch_ = len(self.training_history_)
 
         self.is_trained = True
 
@@ -155,7 +224,8 @@ class FINNPricingModel:
         raw_inputs = _build_raw_dataset([payload], device=device, requires_grad=True)
         features = self._encode_feature_matrix(raw_inputs)
         standardized = self._standardize_features(features)
-        predictions = self.model_(standardized).reshape(-1)
+        raw_predictions = self.model_(standardized).reshape(-1)
+        predictions = self._price_from_network(raw_inputs, raw_predictions)
 
         fair_value = predictions[0]
         dV_dS = torch.autograd.grad(
@@ -206,6 +276,8 @@ class FINNPricingModel:
                 "feature_mean": self.feature_mean_.detach().cpu(),
                 "feature_std": self.feature_std_.detach().cpu(),
                 "training_history": self.training_history_,
+                "best_epoch": self.best_epoch_,
+                "best_validation_loss": self.best_validation_loss_,
             },
             path,
         )
@@ -227,14 +299,36 @@ class FINNPricingModel:
             input_dim=saved_config.input_dim,
             hidden_dims=saved_config.hidden_dims,
             activation=saved_config.activation,
+            zero_initialize_output=False,
         ).to(model._resolve_device())
         model.model_.load_state_dict(checkpoint["state_dict"])
         model.model_.eval()
         model.feature_mean_ = checkpoint["feature_mean"].to(model._resolve_device())
         model.feature_std_ = checkpoint["feature_std"].to(model._resolve_device())
         model.training_history_ = list(checkpoint.get("training_history", []))
+        model.best_epoch_ = checkpoint.get("best_epoch")
+        model.best_validation_loss_ = checkpoint.get("best_validation_loss")
         model.is_trained = True
         return model
+
+    def _validation_data_loss(
+        self,
+        features: Sequence[FINNInput],
+        targets: Sequence[float],
+    ) -> float:
+        assert torch is not None
+        assert F is not None
+        assert self.model_ is not None
+        device = self._resolve_device()
+        dataset = _build_raw_dataset(features, device=device)
+        targets_tensor = torch.tensor(targets, dtype=torch.float32, device=device).reshape(-1)
+        with torch.no_grad():
+            feature_matrix = self._encode_feature_matrix(dataset)
+            standardized = self._standardize_features(feature_matrix)
+            raw_predictions = self.model_(standardized).reshape(-1)
+            predictions = self._price_from_network(dataset, raw_predictions)
+            loss = F.mse_loss(predictions, targets_tensor)
+        return float(loss.detach().cpu())
 
     def _encode_feature_matrix(self, raw_inputs: dict[str, Tensor]) -> Tensor:
         S = raw_inputs["S"]
@@ -269,6 +363,27 @@ class FINNPricingModel:
         assert self.feature_std_ is not None
         return (features - self.feature_mean_) / self.feature_std_
 
+    def _price_from_network(
+        self,
+        raw_inputs: dict[str, Tensor],
+        raw_output: Tensor,
+    ) -> Tensor:
+        assert torch is not None
+        assert F is not None
+        if self.config.prediction_mode == "direct":
+            return F.softplus(raw_output).reshape(-1)
+        if self.config.prediction_mode == "bsm_residual":
+            anchor = _torch_black_scholes_price(raw_inputs)
+            residual_scale = (
+                torch.clamp(
+                    anchor.detach().abs(),
+                    min=self.config.residual_anchor_floor,
+                )
+                * self.config.residual_scale
+            )
+            return torch.clamp(anchor + residual_scale * torch.tanh(raw_output), min=0.0)
+        raise ValueError("prediction_mode must be 'direct' or 'bsm_residual'.")
+
     def _resolve_device(self) -> "torch.device":
         assert torch is not None
         if self.config.device == "cuda" and torch.cuda.is_available():
@@ -283,7 +398,14 @@ class FINNPricingModel:
 
 
 class _FINNNetwork(nn.Module):
-    def __init__(self, input_dim: int, hidden_dims: Iterable[int], activation: str) -> None:
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dims: Iterable[int],
+        activation: str,
+        *,
+        zero_initialize_output: bool,
+    ) -> None:
         super().__init__()
         layers: list[nn.Module] = []
         current_dim = input_dim
@@ -292,12 +414,45 @@ class _FINNNetwork(nn.Module):
             layers.append(nn.Linear(current_dim, hidden_dim))
             layers.append(activation_module())
             current_dim = hidden_dim
-        layers.append(nn.Linear(current_dim, 1))
+        output_layer = nn.Linear(current_dim, 1)
+        if zero_initialize_output:
+            nn.init.zeros_(output_layer.weight)
+            nn.init.zeros_(output_layer.bias)
+        layers.append(output_layer)
         self.network = nn.Sequential(*layers)
 
     def forward(self, features: Tensor) -> Tensor:
-        raw_output = self.network(features)
-        return F.softplus(raw_output).reshape(-1)
+        return self.network(features).reshape(-1)
+
+
+SQRT_TWO = math.sqrt(2.0)
+
+
+def _torch_black_scholes_price(raw_inputs: dict[str, Tensor]) -> Tensor:
+    assert torch is not None
+
+    S = raw_inputs["S"]
+    K = raw_inputs["K"]
+    T = raw_inputs["T"]
+    r = raw_inputs["r"]
+    sigma = raw_inputs["sigma_regime"]
+    q = raw_inputs["dividend_yield"]
+    option_type_sign = raw_inputs["option_type_sign"]
+
+    sigma_sqrt_t = sigma * torch.sqrt(T)
+    d1 = (torch.log(S / K) + (r - q + 0.5 * sigma.square()) * T) / sigma_sqrt_t
+    d2 = d1 - sigma_sqrt_t
+    discount_r = torch.exp(-r * T)
+    discount_q = torch.exp(-q * T)
+
+    call = S * discount_q * _torch_normal_cdf(d1) - K * discount_r * _torch_normal_cdf(d2)
+    put = K * discount_r * _torch_normal_cdf(-d2) - S * discount_q * _torch_normal_cdf(-d1)
+    return torch.where(option_type_sign > 0, call, put)
+
+
+def _torch_normal_cdf(values: Tensor) -> Tensor:
+    assert torch is not None
+    return 0.5 * (1.0 + torch.erf(values / SQRT_TWO))
 
 
 def _build_raw_dataset(

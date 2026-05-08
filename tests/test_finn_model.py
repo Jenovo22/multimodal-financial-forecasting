@@ -155,6 +155,27 @@ def test_finn_model_fit_predict_save_and_load(tmp_path):
     )
 
 
+def test_bsm_residual_mode_starts_from_analytical_anchor():
+    features, targets = build_training_samples()
+    model = FINNPricingModel(
+        FINNConfig(
+            hidden_dims=(16,),
+            epochs=1,
+            batch_size=6,
+            learning_rate=0.0,
+            lambda_boundary=0.0,
+            lambda_pde=0.0,
+            lambda_arbitrage=0.0,
+            prediction_mode="bsm_residual",
+        )
+    )
+
+    model.fit(features, targets)
+    prediction = model.predict(features[0])
+
+    assert prediction.fair_value == pytest.approx(targets[0], abs=1e-4)
+
+
 def test_finn_model_uses_safe_std_for_constant_features():
     features, targets = build_training_samples()
     constant_spot_features = [

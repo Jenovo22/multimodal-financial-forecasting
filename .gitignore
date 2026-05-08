@@ -3,16 +3,22 @@ __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
 .env
+.env.*
+!.env.example
 .DS_Store
 *.log
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 .venv/
 venv/
 dist/
 build/
 *.egg-info/
 
-# Archivos grandes comunes en ML / Data Science
+# Common large ML / data-science artifacts.
 *.h5
 *.keras
 *.pkl
@@ -20,8 +26,10 @@ build/
 *.pt
 *.pth
 
-# Carpetas de datos, edita si SÍ quieres subirlas
+# Generated data and local artifacts. Historical tracked data remains tracked
+# until the team explicitly migrates it out of Git.
 /data/
 /datasets/
 /Data/
 /artifacts/
+/reports/
