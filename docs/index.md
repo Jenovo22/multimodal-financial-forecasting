@@ -5,6 +5,7 @@ This folder contains the working documentation for collaboration. The older `mar
 ## Start Here
 
 - [Architecture](architecture.md): how data, HMM, FINN, API and dashboard connect.
+- [Project Context](project_context.md): exhaustive current-state guide for data, architecture, FINN, API, dashboard, setup and priority tasks.
 - [Data Policy](data_policy.md): what belongs in Git and how to handle local/generated data.
 - [Training](training.md): robust training commands, split strategy and metric interpretation.
 - [API](api.md): local API startup and endpoint contracts.

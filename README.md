@@ -26,7 +26,7 @@ reports/              Local generated reports, ignored by Git
 .github/              CI, PR template and issue templates
 ```
 
-Start with [docs/index.md](docs/index.md) for architecture, data policy, training, API and dashboard documentation.
+Start with [docs/index.md](docs/index.md) for architecture, data policy, training, API and dashboard documentation. For a complete current-state overview, read [docs/project_context.md](docs/project_context.md).
 
 ## Setup
 
