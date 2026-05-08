@@ -21,12 +21,14 @@ docs/                 Collaboration and operational documentation
 markdown/             Legacy MVP specs and schema references
 notebooks/            Exploratory and legacy notebooks
 Data/                 Local/legacy data files
+Splits/               Particiones locales generadas, ignoradas por Git
 artifacts/            Local model checkpoints, ignored by Git
 reports/              Local generated reports, ignored by Git
 .github/              CI, PR template and issue templates
 ```
 
 Start with [docs/index.md](docs/index.md) for architecture, data policy, training, API and dashboard documentation. For a complete current-state overview, read [docs/project_context.md](docs/project_context.md).
+Para politica de datos y particiones en disco, consulta [docs/data_policy.md](docs/data_policy.md). Para comandos de particion y entrenamiento, consulta [docs/training.md](docs/training.md).
 
 ## Setup
 
@@ -138,6 +140,7 @@ Generated datasets, model checkpoints and reports should usually stay local:
 
 - `Data/raw/`
 - `Data/processed/`
+- `Splits/`
 - `artifacts/`
 - `reports/`
 

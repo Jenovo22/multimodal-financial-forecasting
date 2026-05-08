@@ -113,6 +113,7 @@ tests/                Tests unitarios/integracion
 docs/                 Documentacion operativa y colaborativa
 markdown/             Especificaciones MVP y schema legacy
 Data/                 Datos historicos/locales
+Splits/               Particiones generadas de datos, ignoradas por Git
 artifacts/            Checkpoints locales, ignorados por Git
 reports/              Reportes locales, ignorados por Git
 notebooks/            Notebooks exploratorios/legacy
@@ -154,6 +155,7 @@ Descripcion:
 | `scripts/build_spy_regime_table.py` | Construir tabla de regimenes SPY |
 | `scripts/download_option_chain.py` | Descargar cadena de opciones y opcionalmente construir dataset |
 | `scripts/update_spy_options.ps1` | Automatizar actualizacion de opciones SPY |
+| `scripts/create_data_splits.py` | Genera particiones train/validation/test en `Splits/`, preservando la estructura original de `Data/` y creando manifests de auditoria |
 | `scripts/train_finn_model.py` | Entrenar FINN con split, checkpoint y metricas |
 | `scripts/score_option_dataset.py` | Puntuar dataset de opciones con FINN/API pipeline |
 | `scripts/run_api.py` | Levantar API local |
@@ -174,11 +176,24 @@ Archivos/carpetas generadas ignoradas por Git:
 
 ```text
 Data/
+Splits/
 artifacts/
 reports/
 ```
 
 Nota importante: algunos archivos dentro de `Data/` ya estaban versionados historicamente. No deben borrarse casualmente; si se decide migrar datos fuera de Git, debe hacerse en una PR dedicada de data migration.
+
+### 4.1.1 Particiones En Disco
+
+Existe una estructura local de particiones generadas en:
+
+```text
+Splits/
+```
+
+La carpeta `Splits/` preserva la estructura de `Data/` dentro de cada particion y permite auditar que archivos o filas quedaron en `train`, `validation`, `test` o `shared`. El flujo actual genera manifests en `Splits/<strategy>_split/manifests/`, por ejemplo `split_manifest.json` y `split_summary.csv`.
+
+La particion recomendada con un solo snapshot de opciones es `expiration`. Cuando existan multiples snapshots diarios, la estrategia recomendada sera `timestamp` para evaluar fechas futuras no vistas. Esta estructura ya organiza la data en disco, pero no implica por si sola validacion temporal robusta.
 
 ### 4.2 Dataset De Mercado Principal
 
@@ -1357,6 +1372,8 @@ Esta seccion detalla las tareas principales por frente. Cada una deberia convert
 
 Objetivo: pasar de un MVP con un solo snapshot a un sistema evaluable en tiempo real/historico.
 
+Estado actual: la particion explicita en disco ya esta implementada mediante `scripts/create_data_splits.py` y la salida local vive en `Splits/`. La validacion temporal real sigue pendiente porque depende de contar con multiples snapshots diarios de opciones.
+
 #### Tarea 1: Crear workflow diario de snapshots de opciones
 
 Problema:
@@ -1412,11 +1429,12 @@ Definicion de terminado:
 
 Problema:
 
-El split por expiracion no prueba si el modelo funciona en fechas futuras.
+El split por expiracion y la estructura actual de `Splits/` organizan la data, pero no prueban si el modelo funciona en fechas futuras cuando solo existe un snapshot de opciones.
 
 Alcance:
 
-- Usar `--split-strategy timestamp`.
+- Usar `--split-strategy timestamp` en entrenamiento cuando exista data multi-dia.
+- Usar `scripts/create_data_splits.py --strategy timestamp` para generar particiones auditables en disco.
 - Entrenar con fechas antiguas.
 - Validar con fechas intermedias.
 - Testear con fechas futuras no vistas.
@@ -1608,7 +1626,8 @@ Orden recomendado:
 1. Consolidar data temporal:
    - snapshots diarios
    - dataset combinado
-   - timestamp split
+   - timestamp split cuando existan multiples snapshots
+   - mantener `Splits/` como salida auditable, no como fuente primaria
 
 2. Reentrenar y validar con fechas futuras:
    - FINN residual vs BSM
@@ -1682,4 +1701,3 @@ Colaboracion:
 - `.github/ISSUE_TEMPLATE/experiment.md`
 - `.github/ISSUE_TEMPLATE/feature_request.md`
 - `.github/ISSUE_TEMPLATE/bug_report.md`
-

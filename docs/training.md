@@ -2,6 +2,41 @@
 
 The current robust path trains FINN with a supervised target, no-arbitrage regularization and a Black-Scholes-Merton residual anchor.
 
+## Preparar particiones de datos
+
+Antes de entrenar, se puede generar una particion explicita y auditable en `Splits/` sin modificar la carpeta original `Data/`. El script preserva la estructura de `Data/` dentro de cada split y escribe manifests de auditoria.
+
+Caso actual, con un solo snapshot de opciones:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\create_data_splits.py `
+  --strategy expiration `
+  --clear-output
+```
+
+Caso futuro, cuando existan multiples snapshots diarios:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\create_data_splits.py `
+  --strategy timestamp `
+  --clear-output
+```
+
+Revisar el resumen generado:
+
+```powershell
+Import-Csv Splits\expiration_split\manifests\split_summary.csv |
+  Format-Table split, rows, split_column, split_mode, key_start, key_end, target_path -AutoSize
+```
+
+Opciones principales:
+
+- `--strategy expiration`: separa por expiracion. Es la opcion recomendada mientras solo haya un snapshot de opciones.
+- `--strategy timestamp`: separa por fecha o timestamp. Debe preferirse cuando ya existan varios snapshots diarios.
+- `--clear-output`: limpia la particion generada previamente para evitar mezclar resultados viejos y nuevos.
+
+El script de entrenamiento puede seguir generando sus propios splits internos si se usa `scripts\train_finn_model.py` con `--split-strategy`. La carpeta `Splits/` sirve principalmente como particion explicita y auditable de datos en disco.
+
 ## Current Recommended Training
 
 Use this while the project has only one option snapshot date:
@@ -66,4 +101,3 @@ A model is not operationally strong just because MAE improves. Also inspect spre
 5. Compare FINN against BSM on the future test window.
 6. Score the latest option chain with realistic transaction cost and safety margin.
 7. Review dashboard candidates by liquidity before considering any simulated trade.
-
