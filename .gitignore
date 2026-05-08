@@ -18,3 +18,20 @@ dist/
 build/
 *.egg-info/
 /seguridad/
+
+# Common large ML / data-science artifacts.
+*.h5
+*.keras
+*.pkl
+*.joblib
+*.pt
+*.pth
+
+# Generated local outputs. Existing tracked files remain tracked until the
+# team performs a dedicated data/artifact migration.
+/artifacts/
+/reports/
+/Data/raw/options/
+/Data/processed/finn_split_dataset.csv
+/Data/processed/finn_split_predictions.csv
+/Data/processed/scored_options*.csv

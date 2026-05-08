@@ -67,3 +67,8 @@ A model is not operationally strong just because MAE improves. Also inspect spre
 6. Score the latest option chain with realistic transaction cost and safety margin.
 7. Review dashboard candidates by liquidity before considering any simulated trade.
 
+## Architecture Validation
+
+Architecture experiments should be run from the `experiment/model-architecture` branch. Use `scripts/run_finn_architecture_validation.py` to compare hidden-layer widths, activation functions and residual scales without editing code for each run.
+
+See [model_architecture_validation.md](model_architecture_validation.md).

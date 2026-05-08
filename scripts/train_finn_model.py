@@ -115,6 +115,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", default=300, type=int, help="Training epochs.")
     parser.add_argument("--batch-size", default=64, type=int, help="Mini-batch size.")
     parser.add_argument(
+        "--hidden-dims",
+        default=(64, 64),
+        type=_parse_hidden_dims,
+        help="Comma-separated hidden layer widths, for example '64,64' or '128,64'.",
+    )
+    parser.add_argument(
+        "--activation",
+        default="silu",
+        choices=("silu", "relu", "tanh", "gelu"),
+        help="Hidden-layer activation function.",
+    )
+    parser.add_argument(
         "--learning-rate",
         default=1e-3,
         type=float,
@@ -170,6 +182,24 @@ def parse_args() -> argparse.Namespace:
         default=50,
         type=int,
         help="Epochs without validation improvement before stopping.",
+    )
+    parser.add_argument(
+        "--early-stopping-min-delta",
+        default=1e-5,
+        type=float,
+        help="Minimum validation-loss improvement required to reset early stopping.",
+    )
+    parser.add_argument(
+        "--weight-decay",
+        default=1e-6,
+        type=float,
+        help="Adam weight decay.",
+    )
+    parser.add_argument(
+        "--gradient-clip-norm",
+        default=5.0,
+        type=float,
+        help="Gradient clipping norm. Use a negative value to disable clipping.",
     )
     return parser.parse_args()
 
@@ -304,10 +334,16 @@ def main() -> None:
 
 
 def _build_config(args: argparse.Namespace, *, epochs: int) -> FINNConfig:
+    gradient_clip_norm = (
+        None if args.gradient_clip_norm < 0 else args.gradient_clip_norm
+    )
     return FINNConfig(
+        hidden_dims=args.hidden_dims,
+        activation=args.activation,
         epochs=epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
+        weight_decay=args.weight_decay,
         prediction_mode=args.prediction_mode,
         residual_scale=args.residual_scale,
         residual_anchor_floor=args.residual_anchor_floor,
@@ -315,9 +351,26 @@ def _build_config(args: argparse.Namespace, *, epochs: int) -> FINNConfig:
         lambda_pde=args.lambda_pde,
         lambda_arbitrage=args.lambda_arbitrage,
         early_stopping_patience=args.early_stopping_patience,
+        early_stopping_min_delta=args.early_stopping_min_delta,
+        gradient_clip_norm=gradient_clip_norm,
         random_state=args.random_state,
         device=args.device,
     )
+
+
+def _parse_hidden_dims(value: str) -> tuple[int, ...]:
+    parts = [part.strip() for part in value.split(",")]
+    if not parts or any(part == "" for part in parts):
+        raise argparse.ArgumentTypeError("hidden-dims must contain positive integers.")
+    try:
+        dims = tuple(int(part) for part in parts)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "hidden-dims must contain positive integers."
+        ) from exc
+    if any(dim <= 0 for dim in dims):
+        raise argparse.ArgumentTypeError("hidden-dims must be positive.")
+    return dims
 
 
 def _evaluate_all_splits(

@@ -8,6 +8,7 @@ This folder contains the working documentation for collaboration. The older `mar
 - [Project Context](project_context.md): exhaustive current-state guide for data, architecture, FINN, API, dashboard, setup and priority tasks.
 - [Data Policy](data_policy.md): what belongs in Git and how to handle local/generated data.
 - [Training](training.md): robust training commands, split strategy and metric interpretation.
+- [FINN Architecture Validation](model_architecture_validation.md): controlled model-architecture experiments and promotion rules.
 - [API](api.md): local API startup and endpoint contracts.
 - [Dashboard](dashboard.md): how to build and read the prediction dashboard.
 - [Roadmap](roadmap.md): recommended next engineering and research milestones.
