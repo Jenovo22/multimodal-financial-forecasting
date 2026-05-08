@@ -17,19 +17,4 @@ venv/
 dist/
 build/
 *.egg-info/
-
-# Common large ML / data-science artifacts.
-*.h5
-*.keras
-*.pkl
-*.joblib
-*.pt
-*.pth
-
-# Generated data and local artifacts. Historical tracked data remains tracked
-# until the team explicitly migrates it out of Git.
-/data/
-/datasets/
-/Data/
-/artifacts/
-/reports/
+/seguridad/

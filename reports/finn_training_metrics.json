@@ -1,0 +1,135 @@
+{
+  "split_config": {
+    "strategy": "expiration",
+    "train_fraction": 0.6,
+    "validation_fraction": 0.2,
+    "random_state": 42,
+    "final_train_split": "train_val"
+  },
+  "model_config": {
+    "input_dim": 12,
+    "hidden_dims": [
+      64,
+      64
+    ],
+    "activation": "silu",
+    "prediction_mode": "bsm_residual",
+    "residual_scale": 0.5,
+    "residual_anchor_floor": 1.0,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-06,
+    "batch_size": 64,
+    "epochs": 500,
+    "lambda_data": 1.0,
+    "lambda_boundary": 0.1,
+    "lambda_pde": 0.0,
+    "lambda_arbitrage": 1.0,
+    "feature_std_floor": 1e-06,
+    "gradient_clip_norm": 5.0,
+    "early_stopping_patience": 75,
+    "early_stopping_min_delta": 1e-05,
+    "random_state": 42,
+    "device": "cpu"
+  },
+  "split_summary": {
+    "test": {
+      "rows": 62,
+      "expirations": [
+        "2026-06-18"
+      ],
+      "timestamps": [
+        "2026-05-05T00:00:00Z"
+      ],
+      "strike_min": 660.0,
+      "strike_max": 800.0
+    },
+    "train": {
+      "rows": 126,
+      "expirations": [
+        "2026-05-29",
+        "2026-06-05"
+      ],
+      "timestamps": [
+        "2026-05-05T00:00:00Z"
+      ],
+      "strike_min": 658.0,
+      "strike_max": 800.0
+    },
+    "validation": {
+      "rows": 50,
+      "expirations": [
+        "2026-06-12"
+      ],
+      "timestamps": [
+        "2026-05-05T00:00:00Z"
+      ],
+      "strike_min": 677.0,
+      "strike_max": 800.0
+    }
+  },
+  "selection_model": {
+    "checkpoint": "artifacts\\finn_model_selection.pt",
+    "best_epoch": 224,
+    "best_validation_loss": 0.15144550800323486,
+    "history_length": 299,
+    "metrics": {
+      "train": {
+        "rows": 126,
+        "mae": 0.13737268954042406,
+        "rmse": 0.1667837133182086,
+        "mean_error": -0.007240606953227224,
+        "mape_pct": 9.123648583293729,
+        "target_mean": 19.412738095238097,
+        "prediction_mean": 19.40549748828487,
+        "delta_outside_bounds": 0,
+        "gamma_negative": 0,
+        "baseline_mae": 1.9344394397929592,
+        "baseline_rmse": 2.161756263512508
+      },
+      "validation": {
+        "rows": 50,
+        "mae": 0.286092276096344,
+        "rmse": 0.38915995228811195,
+        "mean_error": 0.152304988861084,
+        "mape_pct": 6.163874856422366,
+        "target_mean": 17.804,
+        "prediction_mean": 17.956304988861085,
+        "delta_outside_bounds": 0,
+        "gamma_negative": 17,
+        "baseline_mae": 1.4334403278781531,
+        "baseline_rmse": 1.5501567617230654
+      },
+      "test": {
+        "rows": 62,
+        "mae": 0.9240167836604577,
+        "rmse": 1.2664564293258254,
+        "mean_error": 0.7553107183594854,
+        "mape_pct": 7.344436260620858,
+        "target_mean": 25.573306451612904,
+        "prediction_mean": 26.32861716997239,
+        "delta_outside_bounds": 0,
+        "gamma_negative": 31,
+        "baseline_mae": 1.4930466154835635,
+        "baseline_rmse": 1.6109668331254219
+      }
+    }
+  },
+  "final_model": {
+    "checkpoint": "artifacts\\finn_model.pt",
+    "epochs": 224,
+    "train_rows": 176,
+    "test_metrics": {
+      "rows": 62,
+      "mae": 0.23551354340968575,
+      "rmse": 0.2631981926673229,
+      "mean_error": 0.2092383867117664,
+      "mape_pct": 5.288371051144225,
+      "target_mean": 25.573306451612904,
+      "prediction_mean": 25.78254483832467,
+      "delta_outside_bounds": 0,
+      "gamma_negative": 0,
+      "baseline_mae": 1.4930466154835635,
+      "baseline_rmse": 1.6109668331254219
+    }
+  }
+}
