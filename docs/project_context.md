@@ -73,7 +73,7 @@ El ultimo entrenamiento local registrado en `reports/finn_training_metrics.json`
 
 - `split_strategy`: `expiration`
 - `prediction_mode`: `bsm_residual`
-- `hidden_dims`: `[64, 64]`
+- `hidden_dims`: `[32, 32]` como default validado en la rama de arquitectura
 - `activation`: `silu`
 - `lambda_boundary`: `0.1`
 - `lambda_pde`: `0.0`
@@ -739,7 +739,7 @@ Configuracion actual:
 ```python
 FINNConfig(
     input_dim=12,
-    hidden_dims=(64, 64),
+    hidden_dims=(32, 32),
     activation="silu",
     prediction_mode="bsm_residual",
     residual_scale=0.50,
@@ -752,15 +752,15 @@ Arquitectura:
 ```text
 Input 12
   |
-Linear 12 -> 64
+Linear 12 -> 32
   |
 SiLU
   |
-Linear 64 -> 64
+Linear 32 -> 32
   |
 SiLU
   |
-Linear 64 -> 1
+Linear 32 -> 1
   |
 raw_output
 ```
@@ -1682,4 +1682,3 @@ Colaboracion:
 - `.github/ISSUE_TEMPLATE/experiment.md`
 - `.github/ISSUE_TEMPLATE/feature_request.md`
 - `.github/ISSUE_TEMPLATE/bug_report.md`
-

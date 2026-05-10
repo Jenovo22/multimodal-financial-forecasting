@@ -176,6 +176,71 @@ def test_bsm_residual_mode_starts_from_analytical_anchor():
     assert prediction.fair_value == pytest.approx(targets[0], abs=1e-4)
 
 
+def test_bsm_residual_mixture_mode_starts_from_analytical_anchor():
+    features, targets = build_training_samples()
+    model = FINNPricingModel(
+        FINNConfig(
+            hidden_dims=(16,),
+            epochs=1,
+            batch_size=6,
+            learning_rate=0.0,
+            lambda_boundary=0.0,
+            lambda_pde=0.0,
+            lambda_arbitrage=0.0,
+            prediction_mode="bsm_residual_mixture",
+            residual_experts=3,
+        )
+    )
+
+    model.fit(features, targets)
+    prediction = model.predict(features[0])
+
+    assert prediction.fair_value == pytest.approx(targets[0], abs=1e-4)
+
+
+def test_bsm_residual_mixture_requires_multiple_experts():
+    features, targets = build_training_samples()
+    model = FINNPricingModel(
+        FINNConfig(
+            hidden_dims=(16,),
+            epochs=1,
+            prediction_mode="bsm_residual_mixture",
+            residual_experts=1,
+        )
+    )
+
+    with pytest.raises(ValueError, match="residual_experts"):
+        model.fit(features, targets)
+
+
+def test_bsm_residual_mixture_save_and_load_preserves_prediction(tmp_path):
+    features, targets = build_training_samples()
+    model = FINNPricingModel(
+        FINNConfig(
+            hidden_dims=(16,),
+            epochs=3,
+            batch_size=6,
+            lambda_boundary=0.0,
+            lambda_pde=0.0,
+            lambda_arbitrage=0.0,
+            prediction_mode="bsm_residual_mixture",
+            residual_experts=3,
+        )
+    )
+
+    model.fit(features, targets)
+    prediction = model.predict(features[0])
+    loaded = FINNPricingModel.load(model.save(tmp_path / "mixture.pt"))
+    loaded_prediction = loaded.predict(features[0])
+
+    assert loaded.config.prediction_mode == "bsm_residual_mixture"
+    assert loaded.config.residual_experts == 3
+    assert loaded_prediction.fair_value == pytest.approx(
+        prediction.fair_value,
+        abs=1e-6,
+    )
+
+
 def test_finn_model_uses_safe_std_for_constant_features():
     features, targets = build_training_samples()
     constant_spot_features = [

@@ -116,7 +116,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", default=64, type=int, help="Mini-batch size.")
     parser.add_argument(
         "--hidden-dims",
-        default=(64, 64),
+        default=(32, 32),
         type=_parse_hidden_dims,
         help="Comma-separated hidden layer widths, for example '64,64' or '128,64'.",
     )
@@ -135,10 +135,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--prediction-mode",
         default="bsm_residual",
-        choices=("bsm_residual", "direct"),
+        choices=("bsm_residual", "bsm_residual_mixture", "direct"),
         help=(
             "FINN output strategy. bsm_residual anchors predictions to analytical "
-            "BSM and learns a bounded residual; direct learns price from scratch."
+            "BSM and learns a bounded residual; bsm_residual_mixture learns a "
+            "gated blend of bounded residual experts; direct learns price from scratch."
         ),
     )
     parser.add_argument(
@@ -152,6 +153,12 @@ def parse_args() -> argparse.Namespace:
         default=1.0,
         type=float,
         help="Minimum dollar scale used by the residual anchor.",
+    )
+    parser.add_argument(
+        "--residual-experts",
+        default=3,
+        type=int,
+        help="Number of residual experts used by bsm_residual_mixture.",
     )
     parser.add_argument(
         "--lambda-boundary",
@@ -347,6 +354,7 @@ def _build_config(args: argparse.Namespace, *, epochs: int) -> FINNConfig:
         prediction_mode=args.prediction_mode,
         residual_scale=args.residual_scale,
         residual_anchor_floor=args.residual_anchor_floor,
+        residual_experts=args.residual_experts,
         lambda_boundary=args.lambda_boundary,
         lambda_pde=args.lambda_pde,
         lambda_arbitrage=args.lambda_arbitrage,

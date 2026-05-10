@@ -21,7 +21,9 @@ class ArchitectureExperiment:
     name: str
     hidden_dims: str
     activation: str = "silu"
+    prediction_mode: str = "bsm_residual"
     residual_scale: float = 0.50
+    residual_experts: int = 3
     lambda_boundary: float = 0.1
     lambda_pde: float = 0.0
     lambda_arbitrage: float = 1.0
@@ -39,6 +41,14 @@ DEFAULT_EXPERIMENTS: tuple[ArchitectureExperiment, ...] = (
         hidden_dims="32,32",
         activation="silu",
         residual_scale=0.50,
+    ),
+    ArchitectureExperiment(
+        name="mixture_32x32_silu_3experts_scale050",
+        hidden_dims="32,32",
+        activation="silu",
+        prediction_mode="bsm_residual_mixture",
+        residual_scale=0.50,
+        residual_experts=3,
     ),
     ArchitectureExperiment(
         name="wide_128x128_silu_scale050",
@@ -217,9 +227,11 @@ def _run_training(
         "--activation",
         experiment.activation,
         "--prediction-mode",
-        "bsm_residual",
+        experiment.prediction_mode,
         "--residual-scale",
         str(experiment.residual_scale),
+        "--residual-experts",
+        str(experiment.residual_experts),
         "--lambda-boundary",
         str(experiment.lambda_boundary),
         "--lambda-pde",
@@ -245,7 +257,9 @@ def _summary_row(
         "name": experiment.name,
         "hidden_dims": experiment.hidden_dims,
         "activation": experiment.activation,
+        "prediction_mode": experiment.prediction_mode,
         "residual_scale": experiment.residual_scale,
+        "residual_experts": experiment.residual_experts,
         "selection_best_epoch": metrics["selection_model"]["best_epoch"],
         "selection_test_mae": selection_test["mae"],
         "selection_test_rmse": selection_test["rmse"],
@@ -283,4 +297,3 @@ def _print_summary(rows: list[dict[str, Any]]) -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -30,11 +30,12 @@ from src.models.finn.pde_loss import (
 @dataclass(slots=True, frozen=True)
 class FINNConfig:
     input_dim: int = 12
-    hidden_dims: tuple[int, ...] = (64, 64)
+    hidden_dims: tuple[int, ...] = (32, 32)
     activation: str = "silu"
     prediction_mode: str = "bsm_residual"
     residual_scale: float = 0.50
     residual_anchor_floor: float = 1.0
+    residual_experts: int = 3
     learning_rate: float = 1e-3
     weight_decay: float = 1e-6
     batch_size: int = 64
@@ -85,12 +86,23 @@ class FINNPricingModel:
             raise ValueError("batch_size must be positive.")
         if self.config.epochs <= 0:
             raise ValueError("epochs must be positive.")
-        if self.config.prediction_mode not in {"direct", "bsm_residual"}:
-            raise ValueError("prediction_mode must be 'direct' or 'bsm_residual'.")
+        valid_prediction_modes = {"direct", "bsm_residual", "bsm_residual_mixture"}
+        if self.config.prediction_mode not in valid_prediction_modes:
+            raise ValueError(
+                "prediction_mode must be 'direct', 'bsm_residual' or "
+                "'bsm_residual_mixture'."
+            )
         if self.config.residual_scale < 0:
             raise ValueError("residual_scale must be non-negative.")
         if self.config.residual_anchor_floor <= 0:
             raise ValueError("residual_anchor_floor must be positive.")
+        if (
+            self.config.prediction_mode == "bsm_residual_mixture"
+            and self.config.residual_experts < 2
+        ):
+            raise ValueError(
+                "residual_experts must be at least 2 for bsm_residual_mixture."
+            )
 
         torch.manual_seed(self.config.random_state)
         device = self._resolve_device()
@@ -109,7 +121,8 @@ class FINNPricingModel:
             input_dim=feature_matrix.shape[1],
             hidden_dims=self.config.hidden_dims,
             activation=self.config.activation,
-            zero_initialize_output=self.config.prediction_mode == "bsm_residual",
+            output_dim=_network_output_dim(self.config),
+            zero_initialize_output=_uses_bsm_anchor(self.config.prediction_mode),
         ).to(device)
 
         optimizer = torch.optim.Adam(
@@ -141,7 +154,7 @@ class FINNPricingModel:
                 batch_targets = targets_tensor[batch_indices]
                 batch_features = self._encode_feature_matrix(batch_inputs)
                 standardized = self._standardize_features(batch_features)
-                raw_predictions = self.model_(standardized).reshape(-1)
+                raw_predictions = self.model_(standardized)
                 predictions = self._price_from_network(batch_inputs, raw_predictions)
 
                 data_loss = F.mse_loss(predictions, batch_targets)
@@ -224,7 +237,7 @@ class FINNPricingModel:
         raw_inputs = _build_raw_dataset([payload], device=device, requires_grad=True)
         features = self._encode_feature_matrix(raw_inputs)
         standardized = self._standardize_features(features)
-        raw_predictions = self.model_(standardized).reshape(-1)
+        raw_predictions = self.model_(standardized)
         predictions = self._price_from_network(raw_inputs, raw_predictions)
 
         fair_value = predictions[0]
@@ -292,13 +305,16 @@ class FINNPricingModel:
         _require_torch()
 
         checkpoint = torch.load(Path(source_path), map_location="cpu")
-        saved_config = FINNConfig(**checkpoint["config"])
+        saved_config_payload = dict(checkpoint["config"])
+        saved_config_payload.setdefault("residual_experts", 3)
+        saved_config = FINNConfig(**saved_config_payload)
         resolved_config = config or saved_config
         model = cls(resolved_config)
         model.model_ = _FINNNetwork(
             input_dim=saved_config.input_dim,
             hidden_dims=saved_config.hidden_dims,
             activation=saved_config.activation,
+            output_dim=_network_output_dim(saved_config),
             zero_initialize_output=False,
         ).to(model._resolve_device())
         model.model_.load_state_dict(checkpoint["state_dict"])
@@ -325,7 +341,7 @@ class FINNPricingModel:
         with torch.no_grad():
             feature_matrix = self._encode_feature_matrix(dataset)
             standardized = self._standardize_features(feature_matrix)
-            raw_predictions = self.model_(standardized).reshape(-1)
+            raw_predictions = self.model_(standardized)
             predictions = self._price_from_network(dataset, raw_predictions)
             loss = F.mse_loss(predictions, targets_tensor)
         return float(loss.detach().cpu())
@@ -374,6 +390,7 @@ class FINNPricingModel:
             return F.softplus(raw_output).reshape(-1)
         if self.config.prediction_mode == "bsm_residual":
             anchor = _torch_black_scholes_price(raw_inputs)
+            raw_residual = raw_output.reshape(-1)
             residual_scale = (
                 torch.clamp(
                     anchor.detach().abs(),
@@ -381,8 +398,26 @@ class FINNPricingModel:
                 )
                 * self.config.residual_scale
             )
-            return torch.clamp(anchor + residual_scale * torch.tanh(raw_output), min=0.0)
-        raise ValueError("prediction_mode must be 'direct' or 'bsm_residual'.")
+            return torch.clamp(anchor + residual_scale * torch.tanh(raw_residual), min=0.0)
+        if self.config.prediction_mode == "bsm_residual_mixture":
+            anchor = _torch_black_scholes_price(raw_inputs)
+            mixture_outputs = raw_output.reshape(-1, self.config.residual_experts * 2)
+            raw_residuals = mixture_outputs[:, : self.config.residual_experts]
+            gate_logits = mixture_outputs[:, self.config.residual_experts :]
+            gate_weights = torch.softmax(gate_logits, dim=1)
+            blended_residual = torch.sum(gate_weights * torch.tanh(raw_residuals), dim=1)
+            residual_scale = (
+                torch.clamp(
+                    anchor.detach().abs(),
+                    min=self.config.residual_anchor_floor,
+                )
+                * self.config.residual_scale
+            )
+            return torch.clamp(anchor + residual_scale * blended_residual, min=0.0)
+        raise ValueError(
+            "prediction_mode must be 'direct', 'bsm_residual' or "
+            "'bsm_residual_mixture'."
+        )
 
     def _resolve_device(self) -> "torch.device":
         assert torch is not None
@@ -397,6 +432,16 @@ class FINNPricingModel:
             raise RuntimeError("Feature normalization statistics are missing.")
 
 
+def _uses_bsm_anchor(prediction_mode: str) -> bool:
+    return prediction_mode in {"bsm_residual", "bsm_residual_mixture"}
+
+
+def _network_output_dim(config: FINNConfig) -> int:
+    if config.prediction_mode == "bsm_residual_mixture":
+        return config.residual_experts * 2
+    return 1
+
+
 class _FINNNetwork(nn.Module):
     def __init__(
         self,
@@ -404,6 +449,7 @@ class _FINNNetwork(nn.Module):
         hidden_dims: Iterable[int],
         activation: str,
         *,
+        output_dim: int,
         zero_initialize_output: bool,
     ) -> None:
         super().__init__()
@@ -414,7 +460,7 @@ class _FINNNetwork(nn.Module):
             layers.append(nn.Linear(current_dim, hidden_dim))
             layers.append(activation_module())
             current_dim = hidden_dim
-        output_layer = nn.Linear(current_dim, 1)
+        output_layer = nn.Linear(current_dim, output_dim)
         if zero_initialize_output:
             nn.init.zeros_(output_layer.weight)
             nn.init.zeros_(output_layer.bias)
@@ -422,7 +468,7 @@ class _FINNNetwork(nn.Module):
         self.network = nn.Sequential(*layers)
 
     def forward(self, features: Tensor) -> Tensor:
-        return self.network(features).reshape(-1)
+        return self.network(features)
 
 
 SQRT_TWO = math.sqrt(2.0)

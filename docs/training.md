@@ -21,6 +21,7 @@ Use this while the project has only one option snapshot date:
   --final-train-split train_val `
   --epochs 500 `
   --batch-size 64 `
+  --hidden-dims 32,32 `
   --learning-rate 0.001 `
   --prediction-mode bsm_residual `
   --residual-scale 0.50 `
@@ -69,6 +70,15 @@ A model is not operationally strong just because MAE improves. Also inspect spre
 
 ## Architecture Validation
 
-Architecture experiments should be run from the `experiment/model-architecture` branch. Use `scripts/run_finn_architecture_validation.py` to compare hidden-layer widths, activation functions and residual scales without editing code for each run.
+Architecture experiments should be run from the `experiment/model-architecture` branch. Use `scripts/run_finn_architecture_validation.py` to compare hidden-layer widths, activation functions, residual scales and the experimental `bsm_residual_mixture` mode without editing code for each run.
+
+The current default is the compact validated configuration:
+
+```text
+prediction_mode = bsm_residual
+hidden_dims = 32,32
+activation = silu
+residual_scale = 0.50
+```
 
 See [model_architecture_validation.md](model_architecture_validation.md).

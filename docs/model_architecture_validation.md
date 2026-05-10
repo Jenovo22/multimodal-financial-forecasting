@@ -12,7 +12,7 @@ The current baseline architecture is:
 
 ```text
 prediction_mode = bsm_residual
-hidden_dims = 64,64
+hidden_dims = 32,32
 activation = silu
 residual_scale = 0.50
 lambda_boundary = 0.1
@@ -27,20 +27,23 @@ anchor = BSM(S, K, T, r, sigma_regime, q, option_type)
 price = max(anchor + max(abs(anchor), residual_anchor_floor) * residual_scale * tanh(raw_output), 0)
 ```
 
-This is safer than direct price learning while the dataset is small.
+This is safer than direct price learning while the dataset is small. The
+`32,32` default is intentionally compact because it outperformed wider networks
+in the current expiration-split validation and kept Greek diagnostics clean.
 
 ## Experiment Matrix
 
 The architecture validation runner currently covers:
 
-| Experiment | Hidden Dims | Activation | Residual Scale |
-| --- | --- | --- | ---: |
-| `baseline_64x64_silu_scale050` | `64,64` | `silu` | `0.50` |
-| `compact_32x32_silu_scale050` | `32,32` | `silu` | `0.50` |
-| `wide_128x128_silu_scale050` | `128,128` | `silu` | `0.50` |
-| `baseline_64x64_gelu_scale050` | `64,64` | `gelu` | `0.50` |
-| `conservative_64x64_silu_scale025` | `64,64` | `silu` | `0.25` |
-| `flexible_64x64_silu_scale075` | `64,64` | `silu` | `0.75` |
+| Experiment | Mode | Hidden Dims | Activation | Residual Scale | Experts |
+| --- | --- | --- | --- | ---: | ---: |
+| `baseline_64x64_silu_scale050` | `bsm_residual` | `64,64` | `silu` | `0.50` | `1` |
+| `compact_32x32_silu_scale050` | `bsm_residual` | `32,32` | `silu` | `0.50` | `1` |
+| `mixture_32x32_silu_3experts_scale050` | `bsm_residual_mixture` | `32,32` | `silu` | `0.50` | `3` |
+| `wide_128x128_silu_scale050` | `bsm_residual` | `128,128` | `silu` | `0.50` | `1` |
+| `baseline_64x64_gelu_scale050` | `bsm_residual` | `64,64` | `gelu` | `0.50` | `1` |
+| `conservative_64x64_silu_scale025` | `bsm_residual` | `64,64` | `silu` | `0.25` | `1` |
+| `flexible_64x64_silu_scale075` | `bsm_residual` | `64,64` | `silu` | `0.75` | `1` |
 
 ## Commands
 
@@ -140,5 +143,33 @@ Interpretation:
 Recommendation:
 
 - Keep `bsm_residual` as the architecture family.
-- Treat `32,32 + SiLU + residual_scale 0.50` as the current architecture candidate for the next validation round.
-- Do not promote it to the main default until it is re-tested with `--split-strategy timestamp` after multiple option snapshots exist.
+- Promote `32,32 + SiLU + residual_scale 0.50` as the current compact default.
+- Re-test it with `--split-strategy timestamp` after multiple option snapshots exist before treating it as production-robust.
+
+## Experimental Residual Mixture
+
+Run date: 2026-05-09.
+
+The branch also includes an experimental `bsm_residual_mixture` mode. It keeps
+the BSM anchor but predicts several bounded residual experts plus softmax gate
+weights:
+
+```text
+price = BSM + residual_scale * anchor_scale * sum(gate_i * tanh(residual_i))
+```
+
+This is designed to let the model learn different residual corrections across
+moneyness, maturity and regime zones without abandoning the analytical anchor.
+
+Validation against the compact default:
+
+| Experiment | Final MAE | Final RMSE | BSM MAE | Gamma Negative |
+| --- | ---: | ---: | ---: | ---: |
+| `compact_32x32_silu_scale050` | `0.181766` | `0.213050` | `1.493047` | `0` |
+| `mixture_32x32_silu_3experts_scale050` | `0.194962` | `0.227681` | `1.493047` | `0` |
+
+Interpretation:
+
+- The mixture mode is materially better than BSM and preserves clean gamma diagnostics.
+- It did not beat the compact residual default on the current one-snapshot, expiration-split dataset.
+- Keep it as an architecture research option, not as the default, until timestamp-split validation with more snapshots proves a benefit.
